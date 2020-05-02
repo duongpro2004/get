@@ -149,8 +149,8 @@ async function login(username, password) {
 			fshare.password = args[2]
 			if (fshare.password === '') throw new Error('Password is null. Terminate process!')
 		} else {
-			fshare.user_email = 'hut.ytpre@gmail.com'
-			fshare.password = 'uTEAM_2020'
+			fshare.user_email = username
+			fshare.password = password
 		}
 		let options = {
 			'method': 'POST',
