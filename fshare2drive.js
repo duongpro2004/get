@@ -148,7 +148,7 @@ async function login(username, password) {
 			if (fshare.user_email === '123') throw fshare.user_email = 'hut.ytpre@gmail.com'
 			if (!fshare.user_email.includes('@')) throw new Error('Invalid User Email. Terminate process!')
 			fshare.password = args[2]
-			if (fshare.password === '') throw new fshare.password = 'uTEAM_2020'
+			if (fshare.password === '') throw fshare.password = 'uTEAM_2020'
 		} else {
 			fshare.user_email = username
 			fshare.password = password
