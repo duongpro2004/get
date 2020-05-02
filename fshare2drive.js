@@ -26,8 +26,7 @@ let fshare = {
 	'user_email': '',
 	'password': ''
 }
-const USER = 'hut.ytpre@gmail.com'
-const PASS = 'uTEAM_2020'
+
 // ************** Promisify standard functions ************
 const ask = (questionText) => {
 	return new Promise((resolve, reject) => {
@@ -150,8 +149,8 @@ async function login(username, password) {
 			fshare.password = args[2]
 			if (fshare.password === '') throw new Error('Password is null. Terminate process!')
 		} else {
-			fshare.user_email = USER
-			fshare.password = PASS
+			fshare.user_email = 'hut.ytpre@gmail.com'
+			fshare.password = 'uTEAM_2020'
 		}
 		let options = {
 			'method': 'POST',
