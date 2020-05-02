@@ -23,10 +23,11 @@ const FSHARE_GET_USER_PATH = '/api/user/get'
 const FSHARE_DOWNLOAD_PATH = '/api/session/download'
 let fshare = {
 	'app_key': 'L2S7R6ZMagggC5wWkQhX2+aDi467PPuftWUMRFSn',
-	'user_email': 'hut.ytpre@gmail.com',
-	'password': 'uTEAM_2020'
+	'user_email': '',
+	'password': ''
 }
-
+const USER = 'hut.ytpre@gmail.com'
+const PASS = 'uTEAM_2020'
 // ************** Promisify standard functions ************
 const ask = (questionText) => {
 	return new Promise((resolve, reject) => {
@@ -124,11 +125,11 @@ async function checkLogin(show_log = true){
 			let body = await request(options) // check user profile
 			if (body.code === 201) { // if creds expired, relogin
 				console.error(RED, `Login Failed!!!`)
-				console.error(GREEN, `Trying to relogin with user email ...`)
+				console.error(GREEN, `Trying to relogin with user email ${creds.user_email}...`)
 				// relogin with saved email/pword and overwrite creds file
 				await login(creds.user_email, creds.password)
 			}	else { // if creds still working, finally return
-				if (show_log) console.error(CYAN, `Welcome . Your account is ${body.account_type} (expire at ${new Date(parseInt(body.expire_vip) * 1000)})`)
+				if (show_log) console.error(CYAN, `Welcome ${body.email}. Your account is ${body.account_type} (expire at ${new Date(parseInt(body.expire_vip) * 1000)})`)
 				return
 			}
 		}
@@ -149,8 +150,8 @@ async function login(username, password) {
 			fshare.password = args[2]
 			if (fshare.password === '') throw new Error('Password is null. Terminate process!')
 		} else {
-			fshare.user_email = username
-			fshare.password = password
+			fshare.user_email = USER
+			fshare.password = PASS
 		}
 		let options = {
 			'method': 'POST',
