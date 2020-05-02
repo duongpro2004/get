@@ -23,8 +23,8 @@ const FSHARE_GET_USER_PATH = '/api/user/get'
 const FSHARE_DOWNLOAD_PATH = '/api/session/download'
 let fshare = {
 	'app_key': 'L2S7R6ZMagggC5wWkQhX2+aDi467PPuftWUMRFSn',
-	'user_email': '',
-	'password': ''
+	'user_email': 'hut.ytpre@gmail.com',
+	'password': 'uTEAM_2020'
 }
 
 // ************** Promisify standard functions ************
@@ -145,10 +145,9 @@ async function login(username, password) {
 		try { await deleteFileAsync(creds_path)	} catch(e) {}
 		if (typeof username === 'undefined' || typeof password === 'undefined') {
 			fshare.user_email = args[1]
-			if (fshare.user_email === '123') throw fshare.user_email = 'hut.ytpre@gmail.com'
 			if (!fshare.user_email.includes('@')) throw new Error('Invalid User Email. Terminate process!')
 			fshare.password = args[2]
-			if (fshare.password === '') throw fshare.password = 'uTEAM_2020'
+			if (fshare.password === '') throw new Error('Password is null. Terminate process!')
 		} else {
 			fshare.user_email = username
 			fshare.password = password
