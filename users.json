@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "name": "Nguyen Van A",
+    "username": "nguyenvana",
+    "email": "nguyenvana@example.com",
+    "phone": "0901234567",
+    "city": "Ho Chi Minh",
+    "age": 22
+  },
+  {
+    "id": 2,
+    "name": "Tran Thi B",
+    "username": "tranthib",
+    "email": "tranthib@example.com",
+    "phone": "0912345678",
+    "city": "Ha Noi",
+    "age": 21
+  },
+  {
+    "id": 3,
+    "name": "Le Van C",
+    "username": "levanc",
+    "email": "levanc@example.com",
+    "phone": "0923456789",
+    "city": "Da Nang",
+    "age": 23
+  },
+  {
+    "id": 4,
+    "name": "Pham Thi D",
+    "username": "phamthid",
+    "email": "phamthid@example.com",
+    "phone": "0934567890",
+    "city": "Can Tho",
+    "age": 20
+  },
+  {
+    "id": 5,
+    "name": "Hoang Van E",
+    "username": "hoangvane",
+    "email": "hoangvane@example.com",
+    "phone": "0945678901",
+    "city": "Hue",
+    "age": 24
+  }
+]
