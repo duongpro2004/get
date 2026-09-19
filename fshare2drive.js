@@ -1,264 +1,98 @@
-#! /usr/bin/env node
-const MAX_BUFFER = 1024*1024*10
-const path = require('path')
-const util = require('util')
-const fs = require('fs')
-const http = require('https')
+#!/usr/bin/env python3
+"""
+Screenshot to SRT Playlist Converter
+======================================
+Script này nằm cùng cấp với thư mục 'screenshots'.
+Tự động tìm thư mục 'screenshots' ngay cạnh script, trích xuất IP và Port từ các file ảnh,
+sau đó xuất ra file playlist .m3u để mở bằng VLC Media Player.
 
-const home_dir = (process.platform === 'win32') ? process.env.HOMEPATH : process.env.HOME;
-const creds_path = path.join(home_dir,'.creds')
-let creds = {}
-const args = process.argv.slice(2)
-const rl = require('readline').createInterface({
-	input: process.stdin,
-	output: process.stdout
-})
+Sử dụng:
+    python screenshot_to_playlist.py
+"""
 
-const GREEN = '\x1b[32m%s\x1b[0m'
-const RED = '\x1b[31m%s\x1b[0m'
-const CYAN = '\x1b[36m%s\x1b[0m'
+import os
+import sys
 
-const FSHARE_LOGIN_PATH = '/api/user/login'
-const FSHARE_GET_USER_PATH = '/api/user/get'
-const FSHARE_DOWNLOAD_PATH = '/api/session/download'
-let fshare = {
-	'app_key': 'L2S7R6ZMagggC5wWkQhX2+aDi467PPuftWUMRFSn',
-	'user_email': '',
-	'password': ''
-}
+# Thư mục chứa chính file script này
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Thư mục screenshots nằm cùng cấp với script
+SCREENSHOT_DIR = os.path.join(SCRIPT_DIR, "screenshots")
+# File playlist M3U cũng được lưu cùng cấp với script
+OUTPUT_PLAYLIST = os.path.join(SCRIPT_DIR, "haivision_streams.m3u")
 
-// ************** Promisify standard functions ************
-const ask = (questionText) => {
-	return new Promise((resolve, reject) => {
-		rl.question(questionText, resolve)
-	})
-}
 
-const exists = (path) => {
-	new Promise((resolve, reject) => {
-		fs.access(path, (err) => {
-			if (err) {
-				if (err.code === 'ENOENT') {
-				return resolve(false)
-			}
-			return reject(err)
-			}
-			resolve(true)
-		})
-	})
-}
-fs.exists[util.promisify.custom] = exists
-const file_exists = util.promisify(fs.exists)
-const readFileAsync = util.promisify(fs.readFile)
-const writeFileAsync = util.promisify(fs.writeFile)
-const deleteFileAsync = util.promisify(fs.unlink)
-const exec = util.promisify(require('child_process').exec)
+def generate_playlist():
+    if not os.path.exists(SCREENSHOT_DIR):
+        print(f"[!] Lỗi: Không tìm thấy thư mục 'screenshots' tại:\n    {SCREENSHOT_DIR}")
+        print("👉 Vui lòng đặt file script này nằm cùng cấp (ngay cạnh) thư mục 'screenshots'.")
+        return
 
-function request_promisified(params, postData) {
-	return new Promise(function(resolve, reject) {
-		var req = http.request(params, function(res) {
-			// reject on bad status
-			if (res.statusCode < 200 || res.statusCode >= 300) {
-				return reject(new Error('statusCode=' + res.statusCode))
-			}
-			// cumulate data
-			var body = []
-			res.on('data', function(chunk) {
-				body.push(chunk)
-			})
-			// resolve on end
-			res.on('end', function() {
-				try {
-					body = JSON.parse(Buffer.concat(body).toString())
-				} catch(e) {
-					reject(e)
-				}
-				resolve(body)
-			})
-		})
-		// reject on request error
-		req.on('error', function(err) {
-			// This is not a "Second reject", just a different sort of failure
-			reject(err)
-		})
-		if (postData) {
-			req.write(postData)
-		}
-		// IMPORTANT
-		req.end()
-	})
-}
+    print(f"\n{'=' * 60}")
+    print("🎬 CHUYỂN ĐỔI SCREENSHOTS THÀNH PLAYLIST SRT CHO VLC")
+    print(f"{'=' * 60}")
+    print(f"📁 Thư mục screenshots: {SCREENSHOT_DIR}")
+    print(f"📄 File playlist lưu tại: {OUTPUT_PLAYLIST}")
+    print(f"{'=' * 60}\n")
 
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
-// ******************************************
+    streams_by_ip = {}
+    valid_extensions = {".jpg", ".jpeg", ".png"}
 
-async function request(options, postData) {
-	try {
-		let body = await request_promisified(options, postData)
-		return body
-	} catch (e) {
-		let waitTime = 2
-		console.error(RED, `Retry request ${options.path} with wait time ${waitTime}s...`)
-		await sleep(waitTime * 1000)
-		return await request(options, postData)
-	}
-}
+    # Duyệt qua các thư mục con trong 'screenshots'
+    for root, _, files in os.walk(SCREENSHOT_DIR):
+        ip_folder = os.path.basename(root)
 
-async function checkLogin(show_log = true){
-	try{
-		if (!await file_exists(creds_path)) { // first login
-			console.error(RED, 'No login credentials found!!!')
-			await login() // login and save creds file
-		}	else { // if creds file exists
-			if (show_log) console.error(GREEN, `Found saved credentials at ${creds_path}. Autostart logging in FShare...`)
-			creds = JSON.parse(await readFileAsync(creds_path))
-			let options = {
-				'method': 'GET',
-				'hostname': 'api.fshare.vn',
-				'port': 443,
-				'path': FSHARE_GET_USER_PATH,
-				'headers': {'Cookie': `session_id=${creds.session_id}`}
-			}
-			let body = await request(options) // check user profile
-			if (body.code === 201) { // if creds expired, relogin
-				console.error(RED, `Login Failed!!!`)
-				console.error(GREEN, `Trying to relogin with user email ${creds.user_email}...`)
-				// relogin with saved email/pword and overwrite creds file
-				await login(creds.user_email, creds.password)
-			}	else { // if creds still working, finally return
-				if (show_log) console.error(CYAN, `Welcome ${body.email}. Your account is ${body.account_type} (expire at ${new Date(parseInt(body.expire_vip) * 1000)})`)
-				return
-			}
-		}
-		// repeat (loop recursive)
-		await checkLogin()
-	} catch (e) {
-		console.error(RED, e)
-		process.exit(1)
-	}
-}
+        if root == SCREENSHOT_DIR:
+            continue
 
-async function login(username, password) {
-	try{
-		try { await deleteFileAsync(creds_path)	} catch(e) {}
-		if (typeof username === 'undefined' || typeof password === 'undefined') {
-			fshare.user_email = args[1]
-			if (!fshare.user_email.includes('@')) throw new Error('Invalid User Email. Terminate process!')
-			fshare.password = args[2]
-			if (fshare.password === '') throw new Error('Password is null. Terminate process!')
-		} else {
-			fshare.user_email = username
-			fshare.password = password
-		}
-		let options = {
-			'method': 'POST',
-			'hostname': 'api.fshare.vn',
-			'port': 443,
-			'path': FSHARE_LOGIN_PATH,
-			'headers': {}
-		}
-		body = await request(options, JSON.stringify(fshare))
-		if (body.code === 200) {
-			body.user_email = fshare.user_email
-			body.password = fshare.password
-			await writeFileAsync(creds_path, JSON.stringify(body))
-		} else throw new Error(body.msg)
-	} catch (e) {
-		console.error(RED, `Login failed with error: ${e}`)
-		process.exit(1)
-	}
-}
+        for file in files:
+            ext = os.path.splitext(file)[1].lower()
+            if ext not in valid_extensions:
+                continue
 
-async function transfer(fshare_file, remote_drive, remote_path) {
-	fshare_file = fshare_file.match(/https*.+?\/file\/\w+/)[0]
-	// let fshare_folder = args[0].match(/http\s*:.+?\/folder\/\w+/)[0]
-	let options = {
-		'method': 'POST',
-		'hostname': 'api.fshare.vn',
-		'port': 443,
-		'path': FSHARE_DOWNLOAD_PATH,
-		'headers': {'Cookie': `session_id=${creds.session_id}`}
-	}
-	let data = {
-		'url': fshare_file,
-		'token': creds.token,
-		'password': ''
-	}
-	try {
-		body = await request(options, JSON.stringify(data))
-		fshare_download_url = body.location
-		file_name = decodeURI(fshare_download_url.match(/http.+\/(.+?)$/)[1])
-		if (remote_drive === undefined || remote_path === undefined) {
-			console.log(fshare_download_url)
-		} else {
-			rclone_path = `"${remote_drive}":"${remote_path.replace(/\/$/,'')}/${file_name}"`
-			transfer_cmd = `curl -s "${fshare_download_url}" | rclone rcat --stats-one-line -P --stats 2s ${rclone_path}`
-			console.error(GREEN, `Uploading ${fshare_file} to rclone path ${rclone_path}. Please wait...`)
-			console.log(transfer_cmd)
-		}
-	} catch(e) {console.error(RED, e)}
-}
+            port_str = os.path.splitext(file)[0]
+            # Kiểm tra port là số hợp lệ
+            if port_str.isdigit():
+                port = int(port_str)
+                file_path = os.path.join(root, file)
 
-async function genCmd(fshare_folder, remote_drive, remote_path, page=1, is_root_folder=true) {
-	const folder_code = fshare_folder.match(/folder\/(\w+)$/)[1]
-	const FSHARE_FOLDER_PATH = `/api/v3/files/folder?linkcode=${folder_code}&sort=type,-modified&page=${page}`
-	
-	let options = {
-		'method': 'GET',
-		'hostname': 'www.fshare.vn',
-		'port': 443,
-		'path': FSHARE_FOLDER_PATH
-	}
-	try {
-		const body = await request(options, false)
-		const promises = body.items.map(async item => {
-			if (item.type === 1) {
-				let cmd = `curl -s https://raw.githubusercontent.com/duythongle/fshare2gdrive/master/fshare2gdrive.js | tail -n+2 | node - "https://fshare.vn/file/${item.linkcode}" "${remote_drive}" "${remote_path.replace(/\/$/,'')}/${(is_root_folder ? body.current.name + '/' : '')}" | bash -s`
-				console.log(cmd)
-			}	else {
-				item_folder = `https://fshare.vn/folder/${item.linkcode}`
-				item_path = `${remote_path.replace(/\/$/,'')}/${body.current.name}/${item.name}/`
-				await genCmd(item_folder, remote_drive, item_path, 1, false)
-			}
-		})
-		await Promise.all(promises)
-		if (body._links.last !== undefined) {
-			await genCmd(fshare_folder, remote_drive, remote_path, page+1)
-		}
-	} catch (e) {
-		console.error(RED, e)
-		process.exit(1)
-	}
-}
+                # Chỉ lấy ảnh có dung lượng > 0 byte
+                if os.path.getsize(file_path) > 0:
+                    if ip_folder not in streams_by_ip:
+                        streams_by_ip[ip_folder] = []
+                    streams_by_ip[ip_folder].append((port, file_path))
 
-(async () => {
-	try {
-		if (args === undefined) {
-			throw new Error('Invalid arguments!\nPlease input valid arguments. See https://github.com/duythongle/fshare2gdrive#usage for more details')
-		}
-	} catch (e) {
-		console.error(RED, e)
-		process.exit(1)
-	}
-	if (args[0].search(/fshare[.]vn\/folder\//) !== -1){
-		await checkLogin(false)
-		await genCmd(args[0], args[1], args[2])
-		process.exit(0)
-	} else if (args[0].search(/fshare[.]vn\/file\//) !== -1){
-		if (args[1] === undefined || args[2] === undefined) {
-			await checkLogin(false)
-			await transfer(args[0])
-			process.exit(0)
-		} else {
-			await checkLogin()
-			await transfer(args[0], args[1], args[2])
-			process.exit(0)
-		}
-	} else if (args[0] === "login"){
-		try { await deleteFileAsync(creds_path)	} catch(e) {}
-		await checkLogin()
-		process.exit(0)
-	}
-})();
+    if not streams_by_ip:
+        print("[!] Không tìm thấy ảnh chụp port nào hợp lệ trong thư mục 'screenshots'.")
+        return
+
+    total_streams = 0
+    m3u_lines = ["#EXTM3U", "#PLAYLIST:Haivision SRT Active Streams\n"]
+
+    for ip in sorted(streams_by_ip.keys()):
+        ports = sorted(streams_by_ip[ip], key=lambda x: x[0])
+        total_streams += len(ports)
+
+        m3u_lines.append(f"# ==================== IP: {ip} ({len(ports)} streams) ====================")
+        for port, img_path in ports:
+            srt_url = f"srt://{ip}:{port}"
+            clean_img_path = img_path.replace("\\", "/")
+            extinf = f'#EXTINF:-1 tvg-name="{ip}:{port}" tvg-logo="{clean_img_path}" group-title="{ip}", [{ip}:{port}]'
+            m3u_lines.append(extinf)
+            m3u_lines.append(srt_url)
+        m3u_lines.append("")
+
+    try:
+        with open(OUTPUT_PLAYLIST, "w", encoding="utf-8") as f:
+            f.write("\n".join(m3u_lines))
+
+        print(f"[✓] Thành công!")
+        print(f"    - Tổng số IP tìm thấy   : {len(streams_by_ip)}")
+        print(f"    - Tổng số stream SRT    : {total_streams}")
+        print(f"    - File playlist đã lưu  : {OUTPUT_PLAYLIST}")
+        print(f"\n👉 Kéo thả file '{os.path.basename(OUTPUT_PLAYLIST)}' vào VLC Media Player để xem ngay.")
+    except Exception as e:
+        print(f"[!] Lỗi khi ghi file: {e}")
+
+
+if __name__ == "__main__":
+    generate_playlist()
