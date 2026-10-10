@@ -93,7 +93,7 @@ def run_tunnel_worker(remote_ip, remote_start_port, num_flows, local_port):
     all_socks = [local_sock] + out_socks
     flow_idx = 0
     batch_counter = 0
-    BATCH_SIZE = 32
+    BATCH_SIZE = 8
     last_ffmpeg_addr = None
     
     last_stat_time = time.time()
@@ -119,11 +119,18 @@ def run_tunnel_worker(remote_ip, remote_start_port, num_flows, local_port):
                 if s is local_sock:
                     data, addr = local_sock.recvfrom(65535)
                     last_ffmpeg_addr = addr
-                    out_socks[flow_idx].sendto(data, remote_endpoints[flow_idx])
-                    batch_counter += 1
-                    if batch_counter >= BATCH_SIZE:
-                        batch_counter = 0
-                        flow_idx = (flow_idx + 1) % num_flows
+                    
+                    # SRT Protocol: Bit 0 is 1 for Control Packet (Handshake, Keepalive, ACK, NAK)
+                    # Control packets MUST always stay on flow 0 for reliable bidirectional exchange!
+                    if len(data) >= 1 and (data[0] & 0x80) != 0:
+                        out_socks[0].sendto(data, remote_endpoints[0])
+                    else:
+                        out_socks[flow_idx].sendto(data, remote_endpoints[flow_idx])
+                        batch_counter += 1
+                        if batch_counter >= BATCH_SIZE:
+                            batch_counter = 0
+                            flow_idx = (flow_idx + 1) % num_flows
+                    
                     bytes_count += len(data)
                     pkt_count += 1
                 else:
@@ -357,6 +364,8 @@ ffmpeg ^
  -f mpegts ^
  "{output_srt}"
 
+if exist "{stop_file}" goto end_loop
+timeout /t 1 >nul
 goto loop_command
 
 :end_loop
