@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
     "use_tunnel": True,
     "tunnel_remote_ip": "2.28.77.90",
     "tunnel_remote_port": "29900",
-    "tunnel_flows": "16",
+    "tunnel_flows": "4",
     "tunnel_local_port": "12345"
 }
 
@@ -92,9 +92,9 @@ def run_tunnel_worker(remote_ip, remote_start_port, num_flows, local_port):
 
     all_socks = [local_sock] + out_socks
     flow_idx = 0
-    client_map = {}   # addr -> cid
-    id_to_addr = {}   # cid -> addr
-    next_cid = 1
+    batch_counter = 0
+    BATCH_SIZE = 32
+    last_ffmpeg_addr = None
     
     last_stat_time = time.time()
     bytes_count = 0
@@ -118,29 +118,21 @@ def run_tunnel_worker(remote_ip, remote_start_port, num_flows, local_port):
             for s in r:
                 if s is local_sock:
                     data, addr = local_sock.recvfrom(65535)
-                    cid = client_map.get(addr)
-                    if cid is None:
-                        cid = next_cid
-                        next_cid = (next_cid % 65000) + 1
-                        client_map[addr] = cid
-                        id_to_addr[cid] = addr
-                    
-                    header = cid.to_bytes(2, 'big')
-                    packet = header + data
-                    out_socks[flow_idx].sendto(packet, remote_endpoints[flow_idx])
-                    flow_idx = (flow_idx + 1) % num_flows
+                    last_ffmpeg_addr = addr
+                    out_socks[flow_idx].sendto(data, remote_endpoints[flow_idx])
+                    batch_counter += 1
+                    if batch_counter >= BATCH_SIZE:
+                        batch_counter = 0
+                        flow_idx = (flow_idx + 1) % num_flows
                     bytes_count += len(data)
                     pkt_count += 1
                 else:
                     data, _ = s.recvfrom(65535)
-                    if len(data) >= 2:
-                        cid = int.from_bytes(data[:2], 'big')
-                        dest_addr = id_to_addr.get(cid)
-                        if dest_addr:
-                            try:
-                                local_sock.sendto(data[2:], dest_addr)
-                            except Exception:
-                                pass
+                    if last_ffmpeg_addr:
+                        try:
+                            local_sock.sendto(data, last_ffmpeg_addr)
+                        except Exception:
+                            pass
         except Exception:
             time.sleep(0.01)
 
