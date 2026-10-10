@@ -298,7 +298,7 @@ def start_relay():
         target_server = srt_server.split("?")[0].strip()
         tunnel_tag = ""
 
-    output_srt = f"srt://{target_server}?streamid=#!::r={stream_id},m=publish&pkt_size={pkt_size}&latency={latency_us}&sndbuf={sndbuf_bytes}&rcvbuf={sndbuf_bytes}"
+    output_srt = f"srt://{target_server}?streamid=#!::r={stream_id},m=publish&pkt_size={pkt_size}&latency={latency_us}&sndbuf={sndbuf_bytes}&rcvbuf={sndbuf_bytes}&tlpktdrop=0&nakreport=1"
     safe_title_srt = output_srt.replace("&", "^&")
 
     if is_srt_running(output_srt):
